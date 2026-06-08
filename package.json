@@ -1,5 +1,5 @@
 {
-  "name": "ai-test",
+  "name": "ai-sdk-test",
   "version": "0.0.1",
   "description": "WIP",
   "keywords": [],
@@ -7,7 +7,7 @@
   "author": "Chris Cook",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zirkelc/ai-test"
+    "url": "https://github.com/zirkelc/ai-sdk-test"
   },
   "files": [
     "dist"
