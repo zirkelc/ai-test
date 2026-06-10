@@ -54,4 +54,36 @@ describe('Stream', () => {
     // Assert
     expect(drained).toEqual(parts);
   });
+
+  test('simulate() should error with an AbortError when the signal is already aborted', async () => {
+    // Arrange
+    const controller = new AbortController();
+    controller.abort();
+    const stream = Stream.simulate(StreamParts.text('nope'), { abortSignal: controller.signal });
+
+    // Act
+    const error = await Stream.toArray(stream).catch((e: unknown) => e);
+
+    // Assert
+    expect(error).toBeInstanceOf(DOMException);
+    expect((error as DOMException).name).toBe('AbortError');
+  });
+
+  test('simulate() should error the instant the signal fires mid-stream', async () => {
+    // Arrange
+    const controller = new AbortController();
+    const parts = [...StreamParts.text('Hello World'), StreamParts.finish()];
+    const stream = Stream.simulate(parts, { chunkDelayInMs: 10, abortSignal: controller.signal });
+    const reader = stream.getReader();
+
+    // Act
+    const first = await reader.read();
+    controller.abort();
+    const error = await reader.read().catch((e: unknown) => e);
+
+    // Assert
+    expect(first.value).toEqual(parts[0]);
+    expect(error).toBeInstanceOf(DOMException);
+    expect((error as DOMException).name).toBe('AbortError');
+  });
 });

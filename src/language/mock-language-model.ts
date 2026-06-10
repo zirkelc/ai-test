@@ -8,11 +8,10 @@ import type {
   LanguageModelV3StreamResult,
   LanguageModelV3Usage,
 } from '@ai-sdk/provider';
-import { simulateReadableStream } from 'ai';
 import { type Mock, vi } from 'vitest';
 import { defaultFinishReason, defaultUsage, toFinishReason } from '../internal/defaults.js';
 import { Content } from './content.js';
-import { type StreamDelayOptions } from './stream.js';
+import { simulateStream, type StreamDelayOptions } from './stream.js';
 import { StreamParts } from './stream-parts.js';
 
 /** A (possibly partial) non-streaming result; only `content` is required, the rest defaults. */
@@ -104,13 +103,12 @@ const buildGenerateResult = (input: GenerateResultInput): LanguageModelV3Generat
   ...input,
 });
 
-/** Wraps stream parts into a stream result, with optional simulated delays. */
+/** Wraps stream parts into a stream result, with optional simulated delays and abort handling. */
 const buildStreamResult = (
   chunks: Array<LanguageModelV3StreamPart>,
-  initialDelayInMs?: number,
-  chunkDelayInMs?: number,
+  opts: StreamDelayOptions = {},
 ): LanguageModelV3StreamResult => ({
-  stream: simulateReadableStream({ chunks, initialDelayInMs, chunkDelayInMs }),
+  stream: simulateStream(chunks, opts),
 });
 
 /** Resolves the `generate` form of an explicit response into a generate result. */
@@ -129,12 +127,17 @@ const resolveStreamResponse = async (
   response: StreamResponse,
   options: LanguageModelV3CallOptions,
 ): Promise<LanguageModelV3StreamResult> => {
-  if (typeof response === 'string') return buildStreamResult(textToStream(response));
+  const { abortSignal } = options;
+  if (typeof response === 'string') return buildStreamResult(textToStream(response), { abortSignal });
   if (response instanceof Error) throw response;
-  if (Array.isArray(response)) return buildStreamResult(response);
+  if (Array.isArray(response)) return buildStreamResult(response, { abortSignal });
   if (typeof response === 'function') return response(options);
   if ('chunks' in response) {
-    return buildStreamResult(response.chunks, response.initialDelayInMs, response.chunkDelayInMs);
+    return buildStreamResult(response.chunks, {
+      initialDelayInMs: response.initialDelayInMs,
+      chunkDelayInMs: response.chunkDelayInMs,
+      abortSignal: response.abortSignal ?? abortSignal,
+    });
   }
   return response;
 };
@@ -160,13 +163,14 @@ const resolveStream = async (
   response: MockResponse,
   options: LanguageModelV3CallOptions,
 ): Promise<LanguageModelV3StreamResult> => {
-  if (typeof response === 'string') return buildStreamResult(textToStream(response));
+  const { abortSignal } = options;
+  if (typeof response === 'string') return buildStreamResult(textToStream(response), { abortSignal });
   if (response instanceof Error) throw response;
   if (isExplicit(response)) {
     return response.stream === undefined ? notImplemented('doStream') : resolveStreamResponse(response.stream, options);
   }
   if ('content' in response) {
-    return buildStreamResult(contentToStream(response.content, response.finishReason, response.usage));
+    return buildStreamResult(contentToStream(response.content, response.finishReason, response.usage), { abortSignal });
   }
   return notImplemented('doStream');
 };
@@ -234,12 +238,7 @@ const generateResult = (input: string | GenerateResultInput): LanguageModelV3Gen
 const streamResult = (
   input: string | Array<LanguageModelV3StreamPart>,
   opts: StreamDelayOptions = {},
-): LanguageModelV3StreamResult =>
-  buildStreamResult(
-    typeof input === 'string' ? textToStream(input) : input,
-    opts.initialDelayInMs,
-    opts.chunkDelayInMs,
-  );
+): LanguageModelV3StreamResult => buildStreamResult(typeof input === 'string' ? textToStream(input) : input, opts);
 
 /** Builds a usage object, overriding individual token fields on top of the defaults. */
 const usage = (

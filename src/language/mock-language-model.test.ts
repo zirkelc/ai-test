@@ -122,6 +122,25 @@ describe('MockLanguageModel', () => {
       // Assert
       expect(text).toBe('fast');
     });
+
+    test('should error with an AbortError when the call abortSignal fires mid-stream', async () => {
+      // Arrange
+      const controller = new AbortController();
+      const parts = [StreamParts.streamStart(), ...StreamParts.text('Hello World'), StreamParts.finish()];
+      const model = MockLanguageModel.from({ stream: { chunks: parts, chunkDelayInMs: 10 } });
+      const { stream } = await model.doStream({ prompt: [], abortSignal: controller.signal } as never);
+      const reader = stream.getReader();
+
+      // Act
+      const first = await reader.read();
+      controller.abort();
+      const error = await reader.read().catch((e: unknown) => e);
+
+      // Assert
+      expect(first.value).toEqual(parts[0]);
+      expect(error).toBeInstanceOf(DOMException);
+      expect((error as DOMException).name).toBe('AbortError');
+    });
   });
 
   describe('sequencing', () => {

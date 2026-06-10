@@ -154,6 +154,23 @@ const model = MockLanguageModel.from({
 });
 ```
 
+#### Aborting a Stream
+
+The call's `abortSignal` is wired into the simulated stream automatically, so a stream aborted mid-flight errors with an `AbortError` just like a real provider — no custom `ReadableStream` needed. Pair it with `chunkDelayInMs` so the abort can land between chunks.
+
+```typescript
+import { MockLanguageModel, StreamParts } from 'ai-test-kit/language';
+
+const controller = new AbortController();
+
+const model = MockLanguageModel.from({
+  stream: { chunks: [...StreamParts.text('Hello World'), StreamParts.finish()], chunkDelayInMs: 10 },
+});
+
+const result = streamText({ model, prompt: 'Hi', abortSignal: controller.signal });
+// ...later, controller.abort() makes the stream reject with an AbortError
+```
+
 #### Different Responses per Method
 
 Use the `{ generate, stream }` form to drive `doGenerate` and `doStream` independently — for example to return plain text non-streaming but a richer sequence when streamed.
@@ -912,11 +929,11 @@ import type { StreamPartOptions } from 'ai-test-kit/language';
 
 ### `StreamDelayOptions`
 
-Simulated timing shared by `Stream.simulate`, `MockLanguageModel.streamResult`, and the `stream` chunks form.
+Simulated timing shared by `Stream.simulate`, `MockLanguageModel.streamResult`, and the `stream` chunks form. With an `abortSignal`, the stream errors with an `AbortError` the instant the signal fires (mid-delay), matching a real provider stream.
 
 ```ts
 import type { StreamDelayOptions } from 'ai-test-kit/language';
-// { initialDelayInMs?: number; chunkDelayInMs?: number }
+// { initialDelayInMs?: number | null; chunkDelayInMs?: number | null; abortSignal?: AbortSignal }
 ```
 
 ## License
