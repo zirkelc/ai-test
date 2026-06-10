@@ -61,6 +61,51 @@ export const simulateStream = <PART>(chunks: Array<PART>, opts: StreamDelayOptio
   });
 };
 
+/**
+ * Wraps a `ReadableStream` so it can also be consumed via `for await`, piping through a fresh
+ * `TransformStream` so the source stays unlocked. Ported from the AI SDK's `createAsyncIterableStream`.
+ */
+const streamToAsyncIterable = <PART>(source: ReadableStream<PART>): ReadableStream<PART> & AsyncIterable<PART> => {
+  const stream = source.pipeThrough(new TransformStream<PART, PART>());
+  return Object.assign(stream, {
+    [Symbol.asyncIterator](): AsyncIterator<PART> {
+      const reader = stream.getReader();
+      let finished = false;
+      const cleanup = async (): Promise<void> => {
+        finished = true;
+        try {
+          await reader.cancel();
+        } finally {
+          try {
+            reader.releaseLock();
+          } catch {
+            /** ignore if the lock is already released */
+          }
+        }
+      };
+      return {
+        async next(): Promise<IteratorResult<PART>> {
+          if (finished) return { done: true, value: undefined };
+          const { done, value } = await reader.read();
+          if (done) {
+            await cleanup();
+            return { done: true, value: undefined };
+          }
+          return { done: false, value };
+        },
+        async return(): Promise<IteratorResult<PART>> {
+          await cleanup();
+          return { done: true, value: undefined };
+        },
+        async throw(error: unknown): Promise<IteratorResult<PART>> {
+          await cleanup();
+          throw error;
+        },
+      };
+    },
+  });
+};
+
 /** Operations for building, draining, and inspecting language model streams in tests. */
 export const Stream = {
   /** Builds a `ReadableStream` from an array of parts. */
@@ -72,6 +117,10 @@ export const Stream = {
 
   /** Reads a stream to completion and returns every part it emitted. */
   toArray: <PART>(stream: ReadableStream<PART>): Promise<Array<PART>> => convertReadableStreamToArray(stream),
+
+  /** Wraps a `ReadableStream` so it can also be consumed via `for await`. */
+  toIterable: <PART>(stream: ReadableStream<PART>): ReadableStream<PART> & AsyncIterable<PART> =>
+    streamToAsyncIterable(stream),
 
   /** Joins the `text-delta` parts of a stream-part sequence into the full text. */
   text: (parts: Array<LanguageModelV3StreamPart>): string =>

@@ -27,6 +27,7 @@ export type StreamResponse =
   | string
   | Error
   | Array<LanguageModelV3StreamPart>
+  | ReadableStream<LanguageModelV3StreamPart>
   | ({ chunks: Array<LanguageModelV3StreamPart> } & StreamDelayOptions)
   | LanguageModelV3StreamResult
   | LanguageModelV3['doStream'];
@@ -131,6 +132,7 @@ const resolveStreamResponse = async (
   if (typeof response === 'string') return buildStreamResult(textToStream(response), { abortSignal });
   if (response instanceof Error) throw response;
   if (Array.isArray(response)) return buildStreamResult(response, { abortSignal });
+  if (response instanceof ReadableStream) return { stream: response };
   if (typeof response === 'function') return response(options);
   if ('chunks' in response) {
     return buildStreamResult(response.chunks, {
@@ -236,9 +238,12 @@ const generateResult = (input: string | GenerateResultInput): LanguageModelV3Gen
 
 /** Builds a full stream result; a string is assembled into `stream-start` → text → `finish`. */
 const streamResult = (
-  input: string | Array<LanguageModelV3StreamPart>,
+  input: string | Array<LanguageModelV3StreamPart> | ReadableStream<LanguageModelV3StreamPart>,
   opts: StreamDelayOptions = {},
-): LanguageModelV3StreamResult => buildStreamResult(typeof input === 'string' ? textToStream(input) : input, opts);
+): LanguageModelV3StreamResult => {
+  if (input instanceof ReadableStream) return { stream: input };
+  return buildStreamResult(typeof input === 'string' ? textToStream(input) : input, opts);
+};
 
 /** Builds a usage object, overriding individual token fields on top of the defaults. */
 const usage = (

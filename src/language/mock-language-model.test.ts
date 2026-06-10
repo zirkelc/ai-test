@@ -123,6 +123,19 @@ describe('MockLanguageModel', () => {
       expect(text).toBe('fast');
     });
 
+    test('should stream from a bare ReadableStream in the stream form', async () => {
+      // Arrange
+      const parts = [StreamParts.streamStart(), ...StreamParts.text('piped'), StreamParts.finish()];
+      const model = MockLanguageModel.from({ stream: Stream.from(parts) });
+
+      // Act
+      const result = streamText({ model, prompt: 'Hi', ...Options.stream });
+      const text = (await Stream.toArray(result.textStream)).join('');
+
+      // Assert
+      expect(text).toBe('piped');
+    });
+
     test('should error with an AbortError when the call abortSignal fires mid-stream', async () => {
       // Arrange
       const controller = new AbortController();
@@ -237,6 +250,19 @@ describe('MockLanguageModel', () => {
 
       // Assert
       expect(result).toEqual({ unified: 'length', raw: 'length' });
+    });
+
+    test('streamResult() should wrap a ReadableStream as a stream result', async () => {
+      // Arrange
+      const parts = [...StreamParts.text('wrapped'), StreamParts.finish()];
+      const stream = Stream.from(parts);
+
+      // Act
+      const result = MockLanguageModel.streamResult(stream);
+
+      // Assert
+      expect(result.stream).toBe(stream);
+      expect(await Stream.toArray(result.stream)).toEqual(parts);
     });
   });
 

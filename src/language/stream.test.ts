@@ -55,6 +55,35 @@ describe('Stream', () => {
     expect(drained).toEqual(parts);
   });
 
+  test('toIterable() should make a stream consumable via for-await', async () => {
+    // Arrange
+    const stream = Stream.from(['a', 'b', 'c']);
+
+    // Act
+    const collected: Array<string> = [];
+    for await (const item of Stream.toIterable(stream)) {
+      collected.push(item);
+    }
+
+    // Assert
+    expect(collected).toEqual(['a', 'b', 'c']);
+  });
+
+  test('toIterable() should stop reading the source when the loop breaks early', async () => {
+    // Arrange
+    const stream = Stream.from(['a', 'b', 'c']);
+
+    // Act
+    const collected: Array<string> = [];
+    for await (const item of Stream.toIterable(stream)) {
+      collected.push(item);
+      break;
+    }
+
+    // Assert
+    expect(collected).toEqual(['a']);
+  });
+
   test('simulate() should error with an AbortError when the signal is already aborted', async () => {
     // Arrange
     const controller = new AbortController();

@@ -349,9 +349,10 @@ MockLanguageModel.generateResult(input: string | { content: LanguageModelV3Conte
 #### `.streamResult(input, options?)`
 
 ```ts
-MockLanguageModel.streamResult(input: string | LanguageModelV3StreamPart[], options?: StreamDelayOptions): LanguageModelV3StreamResult
+MockLanguageModel.streamResult(input: string | LanguageModelV3StreamPart[] | ReadableStream<LanguageModelV3StreamPart>, options?: StreamDelayOptions): LanguageModelV3StreamResult
 // MockLanguageModel.streamResult('hi'): { stream } — a ReadableStream of stream-start → text → finish
 // MockLanguageModel.streamResult([...StreamParts.text('hi'), StreamParts.finish()]): { stream } — a ReadableStream of the given parts
+// MockLanguageModel.streamResult(Stream.from(parts)): { stream } — wraps an existing ReadableStream as-is (delays ignored)
 ```
 
 #### `.usage(overrides?)`
@@ -527,6 +528,13 @@ Stream.toArray<T>(stream: ReadableStream<T>): Promise<T[]>
 // Stream.toArray(stream): Promise<[a, b]>
 ```
 
+#### `.toIterable(stream)`
+
+```ts
+Stream.toIterable<T>(stream: ReadableStream<T>): ReadableStream<T> & AsyncIterable<T>
+// for await (const part of Stream.toIterable(stream)) { ... } — consume a stream via for-await
+```
+
 #### `.text(parts)`
 
 ```ts
@@ -539,6 +547,31 @@ Stream.text(parts: LanguageModelV3StreamPart[]): string
 ```ts
 Stream.finishReason(parts: LanguageModelV3StreamPart[]): LanguageModelV3FinishReason | undefined
 // Stream.finishReason([StreamParts.finish()]): { unified: 'stop', raw: 'stop' }
+```
+
+#### `Iterable`
+
+The async-iterable complement to `Stream`: build, drain, and convert `AsyncIterable`s (async generators, and anything consumed via `for await`). Use it when the code under test produces or consumes a plain async iterable rather than a `ReadableStream`. Cross back to the `Stream` toolbox with `.toStream`.
+
+#### `.from(items)`
+
+```ts
+Iterable.from<T>(items: T[]): AsyncIterable<T>
+// Iterable.from([a, b]): an async iterable yielding a, then b
+```
+
+#### `.toArray(iterable)`
+
+```ts
+Iterable.toArray<T>(iterable: AsyncIterable<T>): Promise<T[]>
+// Iterable.toArray(iterable): Promise<[a, b]>
+```
+
+#### `.toStream(iterable)`
+
+```ts
+Iterable.toStream<T>(iterable: AsyncIterable<T>): ReadableStream<T>
+// Iterable.toStream(iterable): a ReadableStream emitting a, then b
 ```
 
 #### `Options`
@@ -903,7 +936,7 @@ import type { MockLanguageModel } from 'ai-test-kit/language';
 
 ### `GenerateResponse` / `StreamResponse`
 
-The per-method response shapes used by the `{ generate, stream }` form of `MockResponse`. `stream` accepts a bare `Array<StreamPart>`, or a `{ chunks, initialDelayInMs?, chunkDelayInMs? }` object to simulate delays.
+The per-method response shapes used by the `{ generate, stream }` form of `MockResponse`. `stream` accepts a bare `Array<StreamPart>`, a `ReadableStream<StreamPart>` (used as-is), or a `{ chunks, initialDelayInMs?, chunkDelayInMs? }` object to simulate delays.
 
 ```ts
 import type { GenerateResponse, StreamResponse } from 'ai-test-kit/language';

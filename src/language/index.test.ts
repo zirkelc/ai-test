@@ -9,6 +9,7 @@ describe('language barrel', () => {
     expect(typeof language.Content).toBe('object');
     expect(typeof language.StreamParts).toBe('object');
     expect(typeof language.Stream).toBe('object');
+    expect(typeof language.Iterable).toBe('object');
     expect(typeof language.Options).toBe('object');
   });
 });
