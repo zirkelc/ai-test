@@ -26,6 +26,7 @@
   "scripts": {
     "prepublishOnly": "pnpm build",
     "build": "tsdown",
+    "typecheck": "tsc --noEmit",
     "test": "vitest",
     "lint": "oxlint --fix",
     "lint:ci": "oxlint",

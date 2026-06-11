@@ -925,9 +925,13 @@ fromUIMessage<UIMessage>(): { UIParts; UIChunks; UIMessages }
 
 ## Types
 
-All types are exported from `ai-test-kit/language`.
+Types are split by entry point, mirroring the builders.
 
-### `MockResponse`
+### Language Models
+
+Exported from `ai-test-kit/language`.
+
+#### `MockResponse`
 
 A single mock response. A `string` or `Error` applies to whichever method is called; the object forms target one method explicitly. Pass an `Array<MockResponse>` to sequence responses across calls.
 
@@ -939,7 +943,7 @@ type MockResponse =
   | { generate?; stream? }; // generate and/or stream explicitly
 ```
 
-### `MockLanguageModel`
+#### `MockLanguageModel`
 
 The mock model instance type, as returned by `MockLanguageModel.from()`. Because the namespace and the instance type share the name, you can use `MockLanguageModel` to annotate a model parameter.
 
@@ -947,7 +951,7 @@ The mock model instance type, as returned by `MockLanguageModel.from()`. Because
 import type { MockLanguageModel } from 'ai-test-kit/language';
 ```
 
-### `GenerateResponse` / `StreamResponse`
+#### `GenerateResponse` / `StreamResponse`
 
 The per-method response shapes used by the `{ generate, stream }` form of `MockResponse`. `stream` accepts a bare `Array<StreamPart>`, a `ReadableStream<StreamPart>` (used as-is), or a `{ chunks, initialDelayInMs?, chunkDelayInMs? }` object to simulate delays. Both also accept a `string`, an `Error`, or a **function** of the call options returning the result directly (the escape hatch for input-dependent responses).
 
@@ -955,7 +959,7 @@ The per-method response shapes used by the `{ generate, stream }` form of `MockR
 import type { GenerateResponse, StreamResponse } from 'ai-test-kit/language';
 ```
 
-### `MockLanguageModelOptions`
+#### `MockLanguageModelOptions`
 
 The identity overrides accepted as the second argument to `MockLanguageModel.from()`.
 
@@ -964,7 +968,7 @@ import type { MockLanguageModelOptions } from 'ai-test-kit/language';
 // { provider?: string; modelId?: string }
 ```
 
-### `StreamPartOptions`
+#### `StreamPartOptions`
 
 Options for the streamed-text part builders (`StreamParts.text` / `StreamParts.reasoning`).
 
@@ -973,13 +977,87 @@ import type { StreamPartOptions } from 'ai-test-kit/language';
 // { id?: string; length?: number; separator?: string }
 ```
 
-### `StreamDelayOptions`
+#### `StreamDelayOptions`
 
 Simulated timing shared by `Stream.simulate`, `MockLanguageModel.streamResult`, and the `stream` chunks form. With an `abortSignal`, the stream errors with an `AbortError` the instant the signal fires (mid-delay), matching a real provider stream.
 
 ```ts
 import type { StreamDelayOptions } from 'ai-test-kit/language';
 // { initialDelayInMs?: number | null; chunkDelayInMs?: number | null; abortSignal?: AbortSignal }
+```
+
+### UI Messages
+
+Exported from `ai-test-kit/ui`.
+
+#### `UIMessageParts`
+
+A record of every part variant of a message, keyed by its `type`; index it to pull one variant (a union key yields a union, and dynamic `tool-${name}` / `data-${name}` parts appear under their concrete names). `UIMessageParts<M>['text']` is the long form `Extract<InferUIMessagePart<M>, { type: 'text' }>`.
+
+```ts
+import type { UIMessageParts } from 'ai-test-kit/ui';
+
+type TextPart = UIMessageParts<MyUIMessage>['text'];
+// { type: 'text'; text: string; state?: 'streaming' | 'done' }
+
+type ToolWeatherPart = UIMessageParts<MyUIMessage>['tool-weather'];
+// { type: 'tool-weather'; toolCallId: string; state: '...'; input: ...; output: ... }
+
+type TextOrReasoning = UIMessageParts<MyUIMessage>['text' | 'reasoning'];
+// TextUIPart | ReasoningUIPart
+```
+
+#### `UIMessageChunks`
+
+A record of every chunk variant of a message, keyed by its `type`; index it to pull one variant (a union key yields a union). `UIMessageChunks<M>['text-start']` is the long form `Extract<InferUIMessageChunk<M>, { type: 'text-start' }>`.
+
+```ts
+import type { UIMessageChunks } from 'ai-test-kit/ui';
+
+type TextStartChunk = UIMessageChunks<MyUIMessage>['text-start'];
+// { type: 'text-start'; id: string }
+
+type TextChunk = UIMessageChunks<MyUIMessage>['text-start' | 'text-delta' | 'text-end'];
+// { type: 'text-start'; id: string } | { type: 'text-delta'; id: string; delta: string } | { type: 'text-end'; id: string }
+```
+
+#### `UIMessagePartOf`
+
+Selects a single part variant by `type`. `TYPE` takes an exact type, a union, or a `tool-${string}` template (which the bundle can't express); a non-matching type resolves to `never`.
+
+```ts
+import type { UIMessagePartOf } from 'ai-test-kit/ui';
+
+type TextPart = UIMessagePartOf<MyUIMessage, 'text'>;
+// { type: 'text'; text: string; state?: 'streaming' | 'done' }
+
+type ToolParts = UIMessagePartOf<MyUIMessage, `tool-${string}`>;
+// every tool-* part of the message
+```
+
+#### `UIMessageChunkOf`
+
+Selects a single chunk variant by `type`, with the same rules as `UIMessagePartOf`.
+
+```ts
+import type { UIMessageChunkOf } from 'ai-test-kit/ui';
+
+type TextStartChunk = UIMessageChunkOf<MyUIMessage, 'text-start'>;
+// { type: 'text-start'; id: string }
+
+type ToolChunk = UIMessageChunkOf<MyUIMessage, `tool-${string}`>;
+// every tool-* chunk of the message
+```
+
+#### `InferUIMessagePart`
+
+The union of a message's parts, the part-level counterpart to the AI SDK's `InferUIMessageChunk`. The SDK ships `InferUIMessageChunk` / `InferUIMessageMetadata` / `InferUIMessageData` / `InferUIMessageTools`, but no parts inferer, so the kit adds this one.
+
+```ts
+import type { InferUIMessagePart } from 'ai-test-kit/ui';
+
+type MyUIMessagePart = InferUIMessagePart<MyUIMessage>;
+// TextUIPart | ReasoningUIPart | ToolUIPart<…> | DynamicToolUIPart | SourceUrlUIPart | … (the full parts union)
 ```
 
 ## License
