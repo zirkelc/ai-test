@@ -108,14 +108,14 @@ result.toolCalls[0].toolName; // 'weather'
 
 #### Usage and Finish Reason
 
-By default a mock reports a `stop` finish reason and a small fixed token usage. Override them via the `{ content, finishReason, usage }` form to test code that branches on the finish reason or tracks token usage.
+By default a mock reports a `stop` finish reason and a small fixed token usage. Override them via the `{ content, finishReason, usage }` form to test code that branches on the finish reason or tracks token usage. `finishReason` accepts a bare unified string (`'length'`) or a full object via `MockLanguageModel.finishReason(...)`.
 
 ```typescript
 import { Content, MockLanguageModel } from 'ai-test-kit/language';
 
 const model = MockLanguageModel.from({
   content: [Content.text('truncated…')],
-  finishReason: MockLanguageModel.finishReason('length'),
+  finishReason: 'length',
   usage: MockLanguageModel.usage({ outputTokens: { total: 50 } }),
 });
 
@@ -181,6 +181,18 @@ import { MockLanguageModel, StreamParts } from 'ai-test-kit/language';
 const model = MockLanguageModel.from({
   generate: 'Final answer',
   stream: [...StreamParts.text('Final answer'), StreamParts.finish()],
+});
+```
+
+#### Input-Dependent Responses
+
+For a response that depends on the call (the prompt, tools, or settings), pass a function to `generate` / `stream`. It receives the `doGenerate` / `doStream` call options and returns the result directly — the escape hatch for cases the declarative forms can't express, including a fully custom `LanguageModelV3StreamResult`. The result builders pair well here.
+
+```typescript
+import { MockLanguageModel } from 'ai-test-kit/language';
+
+const model = MockLanguageModel.from({
+  generate: async ({ prompt }) => MockLanguageModel.generateResult(prompt.length > 1 ? 'multi-turn' : 'single-turn'),
 });
 ```
 
@@ -324,6 +336,7 @@ MockLanguageModel.from(input?: MockResponse | MockResponse[], options?: MockLang
 // MockLanguageModel.from(new Error('429')): a model that throws from generate and stream
 // MockLanguageModel.from({ content: [Content.text('Hi')] }): a model returning those parts (stream derived from them)
 // MockLanguageModel.from({ generate: 'A', stream: [...] }): drives doGenerate and doStream independently
+// MockLanguageModel.from({ generate: (options) => result }): a function of the call options (input-dependent)
 // MockLanguageModel.from([new Error('429'), 'ok']): sequences responses per call, clamping to the last
 ```
 
@@ -936,7 +949,7 @@ import type { MockLanguageModel } from 'ai-test-kit/language';
 
 ### `GenerateResponse` / `StreamResponse`
 
-The per-method response shapes used by the `{ generate, stream }` form of `MockResponse`. `stream` accepts a bare `Array<StreamPart>`, a `ReadableStream<StreamPart>` (used as-is), or a `{ chunks, initialDelayInMs?, chunkDelayInMs? }` object to simulate delays.
+The per-method response shapes used by the `{ generate, stream }` form of `MockResponse`. `stream` accepts a bare `Array<StreamPart>`, a `ReadableStream<StreamPart>` (used as-is), or a `{ chunks, initialDelayInMs?, chunkDelayInMs? }` object to simulate delays. Both also accept a `string`, an `Error`, or a **function** of the call options returning the result directly (the escape hatch for input-dependent responses).
 
 ```ts
 import type { GenerateResponse, StreamResponse } from 'ai-test-kit/language';

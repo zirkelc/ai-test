@@ -54,6 +54,14 @@ describe('UIChunks', () => {
     ]);
   });
 
+  test('toolInput() should pass a string input through without re-encoding', () => {
+    // Act
+    const chunks = UIChunks.toolInput({ toolCallId: 'call-1', toolName: 'weather', input: '{"city":"Tokyo"}' });
+
+    // Assert
+    expect(chunks[1]).toEqual({ type: 'tool-input-delta', toolCallId: 'call-1', inputTextDelta: '{"city":"Tokyo"}' });
+  });
+
   test('toolOutputAvailable() should build a tool output chunk', () => {
     // Act
     const chunk = UIChunks.toolOutputAvailable({ toolCallId: 'call-1', output: { temp: 20 } });

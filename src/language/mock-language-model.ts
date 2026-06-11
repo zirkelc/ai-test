@@ -15,21 +15,30 @@ import { simulateStream, type StreamDelayOptions } from './stream.js';
 import { StreamParts } from './stream-parts.js';
 
 /** A (possibly partial) non-streaming result; only `content` is required, the rest defaults. */
-type GenerateResultInput = Partial<LanguageModelV3GenerateResult> & {
+type GenerateResultInput = Omit<Partial<LanguageModelV3GenerateResult>, 'finishReason'> & {
   content: Array<LanguageModelV3Content>;
+  /** The finish reason, as a full object or a bare unified value (e.g. `'length'`). */
+  finishReason?: LanguageModelV3FinishReason | LanguageModelV3FinishReason['unified'];
 };
 
-/** How to respond to a `doGenerate` call. */
+/**
+ * How to respond to a `doGenerate` call. A function receives the call options and returns the generate
+ * result directly — the escape hatch for input-dependent responses.
+ */
 export type GenerateResponse = string | Error | GenerateResultInput | LanguageModelV3['doGenerate'];
 
-/** How to respond to a `doStream` call. A bare array streams without delay; the object form adds delays. */
+/**
+ * How to respond to a `doStream` call. A bare array (or `ReadableStream`) streams without delay; the
+ * `{ chunks, ... }` form adds delays and abort handling. A function receives the call options and
+ * returns the stream result directly — the escape hatch for input-dependent streams or a fully custom
+ * `LanguageModelV3StreamResult` (e.g. one carrying response metadata).
+ */
 export type StreamResponse =
   | string
   | Error
   | Array<LanguageModelV3StreamPart>
   | ReadableStream<LanguageModelV3StreamPart>
   | ({ chunks: Array<LanguageModelV3StreamPart> } & StreamDelayOptions)
-  | LanguageModelV3StreamResult
   | LanguageModelV3['doStream'];
 
 /**
@@ -85,7 +94,7 @@ const partToStreamParts = (part: LanguageModelV3Content, id: string): Array<Lang
 /** Derives a stream from content parts: `stream-start` → one block per part → `finish`. */
 const contentToStream = (
   content: Array<LanguageModelV3Content>,
-  finishReason?: LanguageModelV3FinishReason,
+  finishReason?: LanguageModelV3FinishReason | LanguageModelV3FinishReason['unified'],
   usage?: LanguageModelV3Usage,
 ): Array<LanguageModelV3StreamPart> => [
   StreamParts.streamStart(),
@@ -96,13 +105,16 @@ const contentToStream = (
 /** The streamed form of a string is the streamed form of a single text content part. */
 const textToStream = (text: string): Array<LanguageModelV3StreamPart> => contentToStream([Content.text(text)]);
 
-/** Fills a partial generate result with default finish reason, usage, and warnings. */
-const buildGenerateResult = (input: GenerateResultInput): LanguageModelV3GenerateResult => ({
-  finishReason: defaultFinishReason,
-  usage: defaultUsage,
-  warnings: [],
-  ...input,
-});
+/** Fills a partial generate result with default finish reason, usage, and warnings; coerces a string finish reason. */
+const buildGenerateResult = (input: GenerateResultInput): LanguageModelV3GenerateResult => {
+  const { finishReason, ...rest } = input;
+  return {
+    finishReason: finishReason === undefined ? defaultFinishReason : toFinishReason(finishReason),
+    usage: defaultUsage,
+    warnings: [],
+    ...rest,
+  };
+};
 
 /** Wraps stream parts into a stream result, with optional simulated delays and abort handling. */
 const buildStreamResult = (
@@ -134,14 +146,11 @@ const resolveStreamResponse = async (
   if (Array.isArray(response)) return buildStreamResult(response, { abortSignal });
   if (response instanceof ReadableStream) return { stream: response };
   if (typeof response === 'function') return response(options);
-  if ('chunks' in response) {
-    return buildStreamResult(response.chunks, {
-      initialDelayInMs: response.initialDelayInMs,
-      chunkDelayInMs: response.chunkDelayInMs,
-      abortSignal: response.abortSignal ?? abortSignal,
-    });
-  }
-  return response;
+  return buildStreamResult(response.chunks, {
+    initialDelayInMs: response.initialDelayInMs,
+    chunkDelayInMs: response.chunkDelayInMs,
+    abortSignal: response.abortSignal ?? abortSignal,
+  });
 };
 
 /** Resolves a top-level response for a `doGenerate` call. */

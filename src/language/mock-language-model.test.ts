@@ -42,6 +42,30 @@ describe('MockLanguageModel', () => {
       expect(result.finishReason).toBe('stop');
     });
 
+    test('should accept a unified finish-reason string in the content form', async () => {
+      // Arrange
+      const model = MockLanguageModel.from({ content: [Content.text('truncated')], finishReason: 'length' });
+
+      // Act
+      const result = await generateText({ model, prompt: 'Hi', ...Options.generate });
+
+      // Assert
+      expect(result.finishReason).toBe('length');
+    });
+
+    test('should resolve the generate form from a function of the call options', async () => {
+      // Arrange
+      const model = MockLanguageModel.from({
+        generate: async (options) => MockLanguageModel.generateResult(`prompt-parts:${options.prompt.length}`),
+      });
+
+      // Act
+      const result = await generateText({ model, prompt: 'Hi', ...Options.generate });
+
+      // Assert
+      expect(result.text).toBe('prompt-parts:1');
+    });
+
     test('should surface a tool call from Content.toolCall', async () => {
       // Arrange
       const model = MockLanguageModel.from({
@@ -121,6 +145,20 @@ describe('MockLanguageModel', () => {
 
       // Assert
       expect(text).toBe('fast');
+    });
+
+    test('should resolve the stream form from a function of the call options', async () => {
+      // Arrange
+      const model = MockLanguageModel.from({
+        stream: async (options) => MockLanguageModel.streamResult(options.prompt.length > 0 ? 'has-prompt' : 'empty'),
+      });
+
+      // Act
+      const result = streamText({ model, prompt: 'Hi', ...Options.stream });
+      const text = (await Stream.toArray(result.textStream)).join('');
+
+      // Assert
+      expect(text).toBe('has-prompt');
     });
 
     test('should stream from a bare ReadableStream in the stream form', async () => {
@@ -250,6 +288,28 @@ describe('MockLanguageModel', () => {
 
       // Assert
       expect(result).toEqual({ unified: 'length', raw: 'length' });
+    });
+
+    test('generateResult() should build a full result from a string', () => {
+      // Act
+      const result = MockLanguageModel.generateResult('hi');
+
+      // Assert
+      expect(result.content).toEqual([{ type: 'text', text: 'hi' }]);
+      expect(result.finishReason).toEqual({ unified: 'stop', raw: 'stop' });
+      expect(result.warnings).toEqual([]);
+    });
+
+    test('generateResult() output can drive the doGenerate spy directly', async () => {
+      // Arrange
+      const model = MockLanguageModel.from();
+      model.doGenerate.mockResolvedValue(MockLanguageModel.generateResult('stubbed'));
+
+      // Act
+      const result = await generateText({ model, prompt: 'Hi', ...Options.generate });
+
+      // Assert
+      expect(result.text).toBe('stubbed');
     });
 
     test('streamResult() should wrap a ReadableStream as a stream result', async () => {

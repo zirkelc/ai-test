@@ -1,4 +1,5 @@
 import type { UIDataTypes, UIMessageChunk } from 'ai';
+import { toJSONString } from '../internal/json.js';
 import { tokenize } from '../internal/tokenize.js';
 
 /** A single chunk variant selected from the union by its `type` tag. */
@@ -171,7 +172,7 @@ export const createUIChunks = <METADATA = unknown, DATA extends UIDataTypes = UI
     length?: number;
   }): Array<UIMessageChunk<METADATA, DATA>> => [
     { type: 'tool-input-start', toolCallId: args.toolCallId, toolName: args.toolName },
-    ...tokenize(JSON.stringify(args.input), { length: args.length }).map(
+    ...tokenize(toJSONString(args.input), { length: args.length }).map(
       (inputTextDelta): UIMessageChunk<METADATA, DATA> => ({
         type: 'tool-input-delta',
         toolCallId: args.toolCallId,
