@@ -1,9 +1,16 @@
-# ai-test-kit
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png" />
+  <img src="assets/logo-light.png" alt="ai-test-kit logo" width="400" />
+</picture>
 
 <p align="center">Test Kit for AI SDK: mock models, content builders and stream helpers, fully type-safe</p>
 <p align="center">
   <a href="https://www.npmjs.com/package/ai-test-kit" alt="ai-test-kit"><img src="https://img.shields.io/npm/dt/ai-test-kit?label=ai-test-kit"></a> <a href="https://github.com/zirkelc/ai-test-kit/actions/workflows/ci.yml" alt="CI"><img src="https://img.shields.io/github/actions/workflow/status/zirkelc/ai-test-kit/ci.yml?branch=main"></a>
 </p>
+
+</div>
 
 This library provides a simple, type-safe API for testing AI SDK-powered apps. It gives you small, composable builders for mocking models, generating content and stream parts, and asserting on the results, so your tests stay short, deterministic, and fully typed.
 
