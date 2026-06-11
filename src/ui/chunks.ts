@@ -114,7 +114,8 @@ export const createUIChunks = <METADATA = unknown, DATA extends UIDataTypes = UI
     name: NAME,
     data: DATA[NAME],
     opts: { id?: string; transient?: boolean } = {},
-  ): UIMessageChunk<METADATA, DATA> => ({ type: `data-${name}`, data, ...opts }) as UIMessageChunk<METADATA, DATA>,
+  ): ChunkOf<METADATA, DATA, `data-${NAME}`> =>
+    ({ type: `data-${name}`, data, ...opts }) as unknown as ChunkOf<METADATA, DATA, `data-${NAME}`>,
 
   /** A `start-step` chunk marking the beginning of a step. */
   startStep: (): ChunkOf<METADATA, DATA, 'start-step'> =>

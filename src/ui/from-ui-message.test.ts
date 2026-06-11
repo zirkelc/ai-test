@@ -1,13 +1,11 @@
-import type { UIMessage } from 'ai';
+import type { DynamicToolUIPart, ToolUIPart, UIMessage } from 'ai';
 import { describe, expect, expectTypeOf, test } from 'vitest';
 import { fromUIMessage } from './from-ui-message.js';
 
-/** A concrete message type used to drive inference in these tests. */
-type MyUIMessage = UIMessage<
-  { traceId: string },
-  { weather: { city: string } },
-  { search: { input: { q: string }; output: { hits: number } } }
->;
+/** Concrete data/tools/message types used to drive inference in these tests. */
+type MyData = { weather: { city: string } };
+type MyTools = { search: { input: { q: string }; output: { hits: number } } };
+type MyUIMessage = UIMessage<{ traceId: string }, MyData, MyTools>;
 
 describe('fromUIMessage', () => {
   test('should bind data builders to the message data types', () => {
@@ -57,6 +55,35 @@ describe('fromUIMessage', () => {
       state: 'output-available',
       input: { q: 'cats' },
       output: { hits: 3 },
+    });
+  });
+
+  test('should return the specific part variant so it assigns without a cast', () => {
+    // Arrange
+    const { UIParts } = fromUIMessage<MyUIMessage>();
+
+    // Act — typed to the specific member; a wide-union return type would fail to compile here
+    const tool: ToolUIPart<MyTools> = UIParts.tool('search', {
+      toolCallId: 'c1',
+      state: 'output-available',
+      input: { q: 'cats' },
+      output: { hits: 3 },
+    });
+    const dynamic: DynamicToolUIPart = UIParts.dynamicTool({
+      toolName: 'weather',
+      toolCallId: 'c1',
+      state: 'input-available',
+      input: { city: 'Tokyo' },
+    });
+
+    // Assert
+    expect(tool.type).toBe('tool-search');
+    expect(dynamic).toEqual({
+      type: 'dynamic-tool',
+      toolName: 'weather',
+      toolCallId: 'c1',
+      state: 'input-available',
+      input: { city: 'Tokyo' },
     });
   });
 });
