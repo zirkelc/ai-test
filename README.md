@@ -1007,8 +1007,8 @@ import type { UIMessageParts } from 'ai-test-kit/ui';
 type TextPart = UIMessageParts<MyUIMessage>['text'];
 // { type: 'text'; text: string; state?: 'streaming' | 'done' }
 
-type ToolWeatherPart = UIMessageParts<MyUIMessage>['tool-weather'];
-// { type: 'tool-weather'; toolCallId: string; state: '...'; input: ...; output: ... }
+type ToolSearchPart = UIMessageParts<MyUIMessage>['tool-search'];
+// { type: 'tool-search'; toolCallId: string; state: '...'; input: { q: string }; output: { hits: number } }
 
 type TextOrReasoning = UIMessageParts<MyUIMessage>['text' | 'reasoning'];
 // TextUIPart | ReasoningUIPart
@@ -1030,7 +1030,7 @@ type TextChunk = UIMessageChunks<MyUIMessage>['text-start' | 'text-delta' | 'tex
 
 #### `UIMessagePartOf`
 
-Selects a single part variant by `type`. `TYPE` takes an exact type, a union, or a `tool-${string}` template (which the bundle can't express); a non-matching type resolves to `never`.
+Selects part variants by `type`: an exact type, a union, or a `tool-${string}` prefix template (which a bundle key can't express). Matching is by assignability, so a bare `'tool'` resolves to `never`; keep the `-` to select by prefix. A non-matching type also resolves to `never`.
 
 ```ts
 import type { UIMessagePartOf } from 'ai-test-kit/ui';
@@ -1039,12 +1039,13 @@ type TextPart = UIMessagePartOf<MyUIMessage, 'text'>;
 // { type: 'text'; text: string; state?: 'streaming' | 'done' }
 
 type ToolParts = UIMessagePartOf<MyUIMessage, `tool-${string}`>;
-// every tool-* part of the message
+// every per-tool part (one per tool in the set), here just:
+// tool-search
 ```
 
 #### `UIMessageChunkOf`
 
-Selects a single chunk variant by `type`, with the same rules as `UIMessagePartOf`.
+Selects chunk variants by `type`, with the same rules as `UIMessagePartOf`. Unlike parts, chunks have no `tool-${name}` member; their tool types are the fixed lifecycle tags, so `tool-${string}` selects all of them.
 
 ```ts
 import type { UIMessageChunkOf } from 'ai-test-kit/ui';
@@ -1052,8 +1053,10 @@ import type { UIMessageChunkOf } from 'ai-test-kit/ui';
 type TextStartChunk = UIMessageChunkOf<MyUIMessage, 'text-start'>;
 // { type: 'text-start'; id: string }
 
-type ToolChunk = UIMessageChunkOf<MyUIMessage, `tool-${string}`>;
-// every tool-* chunk of the message
+type ToolChunks = UIMessageChunkOf<MyUIMessage, `tool-${string}`>;
+// every tool lifecycle chunk:
+// tool-input-start | tool-input-delta | tool-input-available | tool-input-error
+// | tool-approval-request | tool-output-available | tool-output-error | tool-output-denied
 ```
 
 #### `InferUIMessagePart`
