@@ -1,21 +1,21 @@
 # ai-test-kit
 
-<p align="center">Test Kit for AI SDK: mock models, content-builders and stream helpers, fully type-safe</p>
+<p align="center">Test Kit for AI SDK: mock models, content builders and stream helpers, fully type-safe</p>
 <p align="center">
   <a href="https://www.npmjs.com/package/ai-test-kit" alt="ai-test-kit"><img src="https://img.shields.io/npm/dt/ai-test-kit?label=ai-test-kit"></a> <a href="https://github.com/zirkelc/ai-test-kit/actions/workflows/ci.yml" alt="CI"><img src="https://img.shields.io/github/actions/workflow/status/zirkelc/ai-test-kit/ci.yml?branch=main"></a>
 </p>
 
-This library provides simple, type-safe helpers for testing AI SDK powered apps with mock models. It turns the low-level `ai/test` primitives into small, composable builders for mocking [`generateText()`](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text) and [`streamText()`](https://ai-sdk.dev/docs/reference/ai-sdk-core/stream-text), assembling content and stream parts, and asserting on the results, so your tests stay short, deterministic, and fully typed. Mock models are plain `vi.fn()` spies, so the Vitest assertions you already use keep working.
+This library provides a simple, type-safe API for testing AI SDK-powered apps. It gives you small, composable builders for mocking models, generating content and stream parts, and asserting on the results, so your tests stay short, deterministic, and fully typed.
 
 ### Why?
 
-The AI SDK ships `MockLanguageModelV3` and other helpers under `ai/test`, but they are deliberately low-level. In practice every project ends up rebuilding the same helpers to:
+The AI SDK ships `MockLanguageModelV3` and a few other test primitives, but they are deliberately low-level. In practice every project ends up rebuilding the same helpers to:
 
 - **Mock a model**: return text, throw an error, or replay a scripted response per call
-- **Build content and stream parts**: assemble valid `text-start` → `text-delta` → `text-end` → `finish` streams by hand
+- **Generate content and stream parts**: assemble valid `text-start` → `text-delta` → `text-end` → `finish` streams by hand
 - **Keep tests deterministic**: pin message ids and timestamps so snapshots are stable
 
-This library provides those helpers as small, composable builders. Models are `vi.fn()` spies, so you can assert on calls with the full Vitest API while also reading the recorded call arguments directly.
+This library ships those helpers, ready to use. Models are `vi.fn()` spies, so you can assert on calls with the full Vitest API while also reading the recorded call arguments directly.
 
 ### Installation
 
