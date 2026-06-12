@@ -259,6 +259,58 @@ model.provider; // 'acme'
 model.modelId; // 'acme-1'
 ```
 
+### Embedding Models
+
+Helpers from `ai-test-kit/embedding` to mock an `EmbeddingModelV3`. `MockEmbeddingModel.from()` takes the embedding vectors directly; pass an `Error` to throw, a function for input-dependent output, or a top-level array to script responses per call.
+
+#### Mocking Embeddings
+
+```typescript
+import { embed } from 'ai';
+import { MockEmbeddingModel } from 'ai-test-kit/embedding';
+
+const model = MockEmbeddingModel.from([[0.1, 0.2, 0.3]]);
+
+const { embedding } = await embed({ model, value: 'Hello' });
+embedding; // [0.1, 0.2, 0.3]
+```
+
+#### Retry and Sequenced Responses
+
+A top-level array scripts a response per call (advancing, then clamping to the last), so you can model a failure that recovers. An embeddings matrix (`number[][]`) is one level shallower than a sequence, so the two never collide.
+
+```typescript
+const model = MockEmbeddingModel.from([new Error('429'), [[0.1, 0.2, 0.3]]]);
+
+await embed({ model, value: 'Hello' }).catch(() => {}); // first call throws
+const { embedding } = await embed({ model, value: 'Hello' }); // second call recovers
+```
+
+### Image Models
+
+Helpers from `ai-test-kit/image` to mock an `ImageModelV3`. `MockImageModel.from()` takes the generated images (base64 strings or binary data); `MockImageModel.image` is a ready-made base64 1x1 PNG.
+
+#### Mocking Image Generation
+
+```typescript
+import { generateImage } from 'ai';
+import { MockImageModel } from 'ai-test-kit/image';
+
+const model = MockImageModel.from([MockImageModel.image]);
+
+const { image } = await generateImage({ model, prompt: 'A sunset' });
+image.base64; // the configured base64 PNG
+```
+
+#### Retry and Sequenced Responses
+
+```typescript
+const model = MockImageModel.from([new Error('429'), [MockImageModel.image]]);
+
+await generateImage({ model, prompt: 'A sunset' }).catch(() => {}); // first call throws
+await generateImage({ model, prompt: 'A sunset' }); // second call recovers
+```
+
 ### UI Messages
 
 Helpers from `ai-test-kit/ui` to build the messages, parts, and chunks exchanged between the server and the client. Use them to test code that operates on `UIMessage`, `UIMessageChunk`, or `UIMessagePart` (custom transports, stream consumers, message reducers). The builders return plain objects shaped to the AI SDK's UI types, so the entry has no runtime cost beyond the types.
@@ -621,6 +673,46 @@ Options.stream: { _internal: { generateId, now } }
 
 > [!NOTE]
 > `Options.stream` pins timestamps via `_internal.now`, but the AI SDK uses `new Date()` directly on the `finish-step` part in the error streaming path. Tests that hit that path additionally need `vi.useFakeTimers()`.
+
+### Embedding Models
+
+Builders from `ai-test-kit/embedding`. `MockEmbeddingModel` is exported as both a value (the namespace) and a type (the model instance).
+
+#### `MockEmbeddingModel`
+
+The namespace, and the type of a model created by `.from()`.
+
+#### `.from(input?, options?)`
+
+Creates a mock `EmbeddingModelV3` whose `doEmbed` is a `vi.fn()` spy. `input` is an `Array<EmbeddingVector>` (the embeddings), an `Error`, a full result, a function of the call options, or an `Array` of those to sequence responses per call. `options` is `{ provider?, modelId?, maxEmbeddingsPerCall?, supportsParallelCalls? }`. Each call is recorded on `doEmbedCalls`.
+
+#### `.result(embeddings, overrides?)`
+
+Builds a full `EmbeddingModelV3Result` from vectors, filling default usage and warnings.
+
+#### `.usage(tokens?)`
+
+Builds an embedding usage object (`{ tokens }`).
+
+### Image Models
+
+Builders from `ai-test-kit/image`. `MockImageModel` is exported as both a value (the namespace) and a type (the model instance).
+
+#### `MockImageModel`
+
+The namespace, and the type of a model created by `.from()`.
+
+#### `.from(input?, options?)`
+
+Creates a mock `ImageModelV3` whose `doGenerate` is a `vi.fn()` spy. `input` is the generated images (`string[]` / `Uint8Array[]`), an `Error`, a full result, a function of the call options, or an `Array` of those to sequence responses per call. `options` is `{ provider?, modelId?, maxImagesPerCall? }`. Each call is recorded on `doGenerateCalls`.
+
+#### `.result(images, overrides?)`
+
+Builds a full generate result from images, filling default warnings and a deterministic `response` (timestamp `new Date(0)`).
+
+#### `.image`
+
+A valid base64 1x1 PNG, handy as a stand-in generated image. Also exported as `validBase64Image`.
 
 ### UI Messages
 
@@ -991,6 +1083,54 @@ Simulated timing shared by `Stream.simulate`, `MockLanguageModel.streamResult`, 
 ```ts
 import type { StreamDelayOptions } from 'ai-test-kit/language';
 // { initialDelayInMs?: number | null; chunkDelayInMs?: number | null; abortSignal?: AbortSignal }
+```
+
+### Embedding Models
+
+Exported from `ai-test-kit/embedding`.
+
+#### `MockEmbeddingModel`
+
+The mock model instance type, as returned by `MockEmbeddingModel.from()`. The namespace and the instance type share the name, so `MockEmbeddingModel` annotates a model parameter.
+
+#### `EmbedResponse`
+
+How to respond to a `doEmbed` call: an `Array<EmbeddingVector>`, an `Error`, a (partial) result, or a function of the call options.
+
+```ts
+import type { EmbedResponse, EmbeddingVector, MockEmbeddingModelOptions } from 'ai-test-kit/embedding';
+```
+
+#### `MockEmbeddingModelOptions`
+
+Identity and capability overrides accepted as the second argument to `.from()`.
+
+```ts
+// { provider?: string; modelId?: string; maxEmbeddingsPerCall?: number; supportsParallelCalls?: boolean }
+```
+
+### Image Models
+
+Exported from `ai-test-kit/image`.
+
+#### `MockImageModel`
+
+The mock model instance type, as returned by `MockImageModel.from()`. The namespace and the instance type share the name, so `MockImageModel` annotates a model parameter.
+
+#### `ImageResponse`
+
+How to respond to a `doGenerate` call: the generated images (`string[]` / `Uint8Array[]`), an `Error`, a (partial) result, or a function of the call options.
+
+```ts
+import type { GeneratedImages, ImageResponse, MockImageModelOptions } from 'ai-test-kit/image';
+```
+
+#### `MockImageModelOptions`
+
+Identity and capability overrides accepted as the second argument to `.from()`.
+
+```ts
+// { provider?: string; modelId?: string; maxImagesPerCall?: number }
 ```
 
 ### UI Messages

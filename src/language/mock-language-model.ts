@@ -10,6 +10,7 @@ import type {
 } from '@ai-sdk/provider';
 import { type Mock, vi } from 'vitest';
 import { defaultFinishReason, defaultUsage, toFinishReason } from '../internal/defaults.js';
+import { defaultProvider, nextModelId } from '../internal/identity.js';
 import { Content } from './content.js';
 import { simulateStream, type StreamDelayOptions } from './stream.js';
 import { StreamParts } from './stream-parts.js';
@@ -62,14 +63,6 @@ export type MockLanguageModelOptions = {
   provider?: string;
   /** The model id; defaults to an auto-incrementing `mock-model-{n}`. */
   modelId?: string;
-};
-
-/** Monotonic counter backing the auto-generated model ids. */
-let modelCounter = 0;
-/** Returns the next unique auto-generated model id. */
-const nextModelId = (): string => {
-  modelCounter += 1;
-  return `mock-model-${modelCounter}`;
 };
 
 /** Throws a clear error when a method is called but no matching response was configured. */
@@ -220,7 +213,7 @@ class LanguageModelMock implements LanguageModelV3 {
 
   /** Builds the spies and identity from the configured response(s) and options. */
   constructor(input: MockResponse | Array<MockResponse> = {}, options: MockLanguageModelOptions = {}) {
-    this.provider = options.provider ?? 'mock-provider';
+    this.provider = options.provider ?? defaultProvider;
     this.modelId = options.modelId ?? nextModelId();
 
     this.doGenerate = vi.fn(async (callOptions: LanguageModelV3CallOptions) => {

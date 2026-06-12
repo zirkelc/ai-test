@@ -16,6 +16,8 @@
   "types": "dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
+    "./embedding": "./dist/embedding/index.mjs",
+    "./image": "./dist/image/index.mjs",
     "./language": "./dist/language/index.mjs",
     "./ui": "./dist/ui/index.mjs",
     "./package.json": "./package.json"
