@@ -36,8 +36,22 @@ npm install -D ai-test-kit
 
 The API is split by layer, each under its own entry point so an import only pulls in the types it needs:
 
+- `ai-test-kit` — generic, layer-agnostic helpers: build, drain, and convert `ReadableStream`s and `AsyncIterable`s with `Streams` and `Iterables`
 - `ai-test-kit/language` — the model layer: mock a `LanguageModelV3`, generate `LanguageModelV3Content` for [`generateText()`](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text) and stream parts `LanguageModelV3StreamPart[]` for [`streamText()`](https://ai-sdk.dev/docs/reference/ai-sdk-core/stream-text)
 - `ai-test-kit/ui` — the UI layer: build `UIMessagePart`, `UIMessageChunk`, and `UIMessage` fixtures, optionally typed to your own `UIMessage`
+
+### Streams and Iterables
+
+Layer-agnostic helpers from the root entry `ai-test-kit` to build, drain, and convert `ReadableStream`s and `AsyncIterable`s. They work with any part type, so they pair with every layer below (language stream parts, UI chunks, plain values).
+
+```typescript
+import { Streams } from 'ai-test-kit';
+import { StreamParts } from 'ai-test-kit/language';
+
+const parts = [...StreamParts.text('Hello World'), StreamParts.finish()];
+
+const drained = await Streams.toArray(Streams.from(parts)); // round-trips parts
+```
 
 ### Language Models
 
@@ -63,12 +77,13 @@ The same model answers both `generateText()` and `streamText()`. For streaming, 
 
 ```typescript
 import { streamText } from 'ai';
-import { MockLanguageModel, Stream } from 'ai-test-kit/language';
+import { Streams } from 'ai-test-kit';
+import { MockLanguageModel } from 'ai-test-kit/language';
 
 const model = MockLanguageModel.from('Hello World');
 
 const result = streamText({ model, prompt: 'Hi' });
-const text = (await Stream.toArray(result.textStream)).join(''); // 'Hello World'
+const text = (await Streams.toArray(result.textStream)).join(''); // 'Hello World'
 ```
 
 #### Throwing Errors
@@ -97,15 +112,15 @@ result.text; // 'recovered'
 
 #### Building Content
 
-Use `Content` to assemble the parts a model returns from `doGenerate`. Pass them via the `content` response form. Like a plain `string`, a `{ content }` mock also serves `streamText()` — the stream is derived from the parts.
+Use `ContentParts` to assemble the parts a model returns from `doGenerate`. Pass them via the `content` response form. Like a plain `string`, a `{ content }` mock also serves `streamText()` — the stream is derived from the parts.
 
 ```typescript
-import { Content, MockLanguageModel } from 'ai-test-kit/language';
+import { ContentParts, MockLanguageModel } from 'ai-test-kit/language';
 
 const model = MockLanguageModel.from({
   content: [
-    Content.text('Here is the weather:'),
-    Content.toolCall({ toolCallId: 'call-1', toolName: 'weather', input: { city: 'Tokyo' } }),
+    ContentParts.text('Here is the weather:'),
+    ContentParts.toolCall({ toolCallId: 'call-1', toolName: 'weather', input: { city: 'Tokyo' } }),
   ],
 });
 
@@ -118,10 +133,10 @@ result.toolCalls[0].toolName; // 'weather'
 By default a mock reports a `stop` finish reason and a small fixed token usage. Override them via the `{ content, finishReason, usage }` form to test code that branches on the finish reason or tracks token usage. `finishReason` accepts a bare unified string (`'length'`) or a full object via `MockLanguageModel.finishReason(...)`.
 
 ```typescript
-import { Content, MockLanguageModel } from 'ai-test-kit/language';
+import { ContentParts, MockLanguageModel } from 'ai-test-kit/language';
 
 const model = MockLanguageModel.from({
-  content: [Content.text('truncated…')],
+  content: [ContentParts.text('truncated…')],
   finishReason: 'length',
   usage: MockLanguageModel.usage({ outputTokens: { total: 50 } }),
 });
@@ -149,7 +164,7 @@ const model = MockLanguageModel.from({
 });
 ```
 
-For timing tests, give the `stream` form a `{ chunks, ... }` object with delays (or use `Stream.simulate`):
+For timing tests, give the `stream` form a `{ chunks, ... }` object with delays (or use `Streams.simulate`):
 
 ```typescript
 const model = MockLanguageModel.from({
@@ -201,21 +216,6 @@ import { MockLanguageModel } from 'ai-test-kit/language';
 const model = MockLanguageModel.from({
   generate: async ({ prompt }) => MockLanguageModel.generateResult(prompt.length > 1 ? 'multi-turn' : 'single-turn'),
 });
-```
-
-#### Inspecting Streams
-
-Use `Stream` to build, drain, and read stream parts when asserting.
-
-```typescript
-import { Stream, StreamParts } from 'ai-test-kit/language';
-
-const parts = [...StreamParts.text('Hello World'), StreamParts.finish()];
-
-Stream.text(parts); // 'Hello World'
-Stream.finishReason(parts)?.unified; // 'stop'
-
-const drained = await Stream.toArray(Stream.from(parts)); // round-trips parts
 ```
 
 #### Deterministic Output
@@ -338,19 +338,19 @@ The text-like builders (`UIChunks.text` / `UIChunks.reasoning` / `UIChunks.toolI
 
 #### Consuming a Chunk Stream
 
-The chunk builders shine when testing code that consumes a `UIMessageChunk` stream. `Stream` (from `ai-test-kit/language`) is layer-agnostic, so it builds and drains chunk streams too.
+The chunk builders shine when testing code that consumes a `UIMessageChunk` stream. `Streams` (from the root `ai-test-kit`) is layer-agnostic, so it builds and drains chunk streams too.
 
 ```typescript
-import { Stream } from 'ai-test-kit/language';
+import { Streams } from 'ai-test-kit';
 import { UIChunks } from 'ai-test-kit/ui';
 
 const chunks = [UIChunks.start(), ...UIChunks.text('Hello'), UIChunks.finish()];
 
-const stream = Stream.from(chunks); // ReadableStream<UIMessageChunk>
+const stream = Streams.from(chunks); // ReadableStream<UIMessageChunk>
 
 // pass `stream` to the code under test (a transport, reducer, readUIMessageStream, …),
 // or drain it to assert on the chunks directly
-const received = await Stream.toArray(stream);
+const received = await Streams.toArray(stream);
 received.length; // 5
 ```
 
@@ -377,6 +377,67 @@ UIParts.tool('search', { toolCallId: 'c1', state: 'output-available', input: { q
 
 ## API
 
+### Streams and Iterables
+
+Generic, layer-agnostic helpers exported from the root `ai-test-kit`.
+
+#### `Streams`
+
+Operations for building, draining, and converting `ReadableStream`s.
+
+#### `.from(parts)`
+
+```ts
+Streams.from<CHUNK>(chunks: CHUNK[]): ReadableStream<CHUNK>
+// Streams.from([a, b]): ReadableStream emitting a, then b
+```
+
+#### `.simulate(chunks, options?)`
+
+```ts
+Streams.simulate<CHUNK>(chunks: CHUNK[], options?: StreamDelayOptions): ReadableStream<CHUNK>
+// Streams.simulate([a, b], { chunkDelayInMs: 5 }): ReadableStream emitting a, then b, with delays
+```
+
+#### `.toArray(stream)`
+
+```ts
+Streams.toArray<CHUNK>(stream: ReadableStream<CHUNK>): Promise<CHUNK[]>
+// Streams.toArray(stream): Promise<[a, b]>
+```
+
+#### `.toIterable(stream)`
+
+```ts
+Streams.toIterable<CHUNK>(stream: ReadableStream<CHUNK>): ReadableStream<CHUNK> & AsyncIterable<CHUNK>
+// for await (const chunk of Streams.toIterable(stream)) { ... } — consume a stream via for-await
+```
+
+#### `Iterables`
+
+The async-iterable complement to `Streams`: build, drain, and convert `AsyncIterable`s (async generators, and anything consumed via `for await`). Use it when the code under test produces or consumes a plain async iterable rather than a `ReadableStream`. Cross back to the `Streams` toolbox with `.toStream`.
+
+#### `.from(items)`
+
+```ts
+Iterables.from<ITEM>(items: ITEM[]): AsyncIterable<ITEM>
+// Iterables.from([a, b]): an async iterable yielding a, then b
+```
+
+#### `.toArray(iterable)`
+
+```ts
+Iterables.toArray<ITEM>(iterable: AsyncIterable<ITEM>): Promise<ITEM[]>
+// Iterables.toArray(iterable): Promise<[a, b]>
+```
+
+#### `.toStream(iterable)`
+
+```ts
+Iterables.toStream<ITEM>(iterable: AsyncIterable<ITEM>): ReadableStream<ITEM>
+// Iterables.toStream(iterable): a ReadableStream emitting a, then b
+```
+
 ### Language Models
 
 Builders and the mock model from `ai-test-kit/language`.
@@ -393,7 +454,7 @@ Creates a mock `LanguageModelV3` from a response spec (or a sequence of them).
 MockLanguageModel.from(input?: MockResponse | MockResponse[], options?: MockLanguageModelOptions): MockLanguageModel
 // MockLanguageModel.from('Hi'): a model returning 'Hi' from generate and stream
 // MockLanguageModel.from(new Error('429')): a model that throws from generate and stream
-// MockLanguageModel.from({ content: [Content.text('Hi')] }): a model returning those parts (stream derived from them)
+// MockLanguageModel.from({ content: [ContentParts.text('Hi')] }): a model returning those parts (stream derived from them)
 // MockLanguageModel.from({ generate: 'A', stream: [...] }): drives doGenerate and doStream independently
 // MockLanguageModel.from({ generate: (options) => result }): a function of the call options (input-dependent)
 // MockLanguageModel.from([new Error('429'), 'ok']): sequences responses per call, clamping to the last
@@ -407,7 +468,7 @@ MockLanguageModel.from(input?: MockResponse | MockResponse[], options?: MockLang
 ```ts
 MockLanguageModel.content(input: string | LanguageModelV3Content[]): LanguageModelV3Content[]
 // MockLanguageModel.content('hi'): [{ type: 'text', text: 'hi' }]
-// MockLanguageModel.content([Content.text('hi')]): [{ type: 'text', text: 'hi' }] — array passes through
+// MockLanguageModel.content([ContentParts.text('hi')]): [{ type: 'text', text: 'hi' }] — array passes through
 ```
 
 #### `.generateResult(input)`
@@ -415,7 +476,7 @@ MockLanguageModel.content(input: string | LanguageModelV3Content[]): LanguageMod
 ```ts
 MockLanguageModel.generateResult(input: string | { content: LanguageModelV3Content[]; finishReason?: LanguageModelV3FinishReason; usage?: LanguageModelV3Usage }): LanguageModelV3GenerateResult
 // MockLanguageModel.generateResult('hi'): { content: [{ type: 'text', text: 'hi' }], finishReason: { unified: 'stop', raw: 'stop' }, usage, warnings: [] }
-// MockLanguageModel.generateResult({ content: [Content.text('hi')] }): { content: [{ type: 'text', text: 'hi' }], finishReason: { unified: 'stop', raw: 'stop' }, usage, warnings: [] }
+// MockLanguageModel.generateResult({ content: [ContentParts.text('hi')] }): { content: [{ type: 'text', text: 'hi' }], finishReason: { unified: 'stop', raw: 'stop' }, usage, warnings: [] }
 ```
 
 #### `.streamResult(input, options?)`
@@ -424,7 +485,7 @@ MockLanguageModel.generateResult(input: string | { content: LanguageModelV3Conte
 MockLanguageModel.streamResult(input: string | LanguageModelV3StreamPart[] | ReadableStream<LanguageModelV3StreamPart>, options?: StreamDelayOptions): LanguageModelV3StreamResult
 // MockLanguageModel.streamResult('hi'): { stream } — a ReadableStream of stream-start → text → finish
 // MockLanguageModel.streamResult([...StreamParts.text('hi'), StreamParts.finish()]): { stream } — a ReadableStream of the given parts
-// MockLanguageModel.streamResult(Stream.from(parts)): { stream } — wraps an existing ReadableStream as-is (delays ignored)
+// MockLanguageModel.streamResult(Streams.from(parts)): { stream } — wraps an existing ReadableStream as-is (delays ignored)
 ```
 
 #### `.usage(overrides?)`
@@ -441,50 +502,50 @@ MockLanguageModel.finishReason(unified?: LanguageModelV3FinishReason['unified'])
 // MockLanguageModel.finishReason('length'): { unified: 'length', raw: 'length' }
 ```
 
-#### `Content`
+#### `ContentParts`
 
 Builders for the static content parts returned from `doGenerate`.
 
 #### `.text(text)`
 
 ```ts
-Content.text(text: string): LanguageModelV3Text
-// Content.text('Hi'): { type: 'text', text: 'Hi' }
+ContentParts.text(text: string): LanguageModelV3Text
+// ContentParts.text('Hi'): { type: 'text', text: 'Hi' }
 ```
 
 #### `.reasoning(text)`
 
 ```ts
-Content.reasoning(text: string): LanguageModelV3Reasoning
-// Content.reasoning('Because...'): { type: 'reasoning', text: 'Because...' }
+ContentParts.reasoning(text: string): LanguageModelV3Reasoning
+// ContentParts.reasoning('Because...'): { type: 'reasoning', text: 'Because...' }
 ```
 
 #### `.toolCall(args)`
 
 ```ts
-Content.toolCall(args: { toolCallId: string; toolName: string; input: unknown }): LanguageModelV3ToolCall
-// Content.toolCall({ toolCallId: 'c1', toolName: 'weather', input: { city: 'Tokyo' } }): { type: 'tool-call', toolCallId: 'c1', toolName: 'weather', input: '{"city":"Tokyo"}' } — input is JSON-stringified unless already a string
+ContentParts.toolCall(args: { toolCallId: string; toolName: string; input: unknown }): LanguageModelV3ToolCall
+// ContentParts.toolCall({ toolCallId: 'c1', toolName: 'weather', input: { city: 'Tokyo' } }): { type: 'tool-call', toolCallId: 'c1', toolName: 'weather', input: '{"city":"Tokyo"}' } — input is JSON-stringified unless already a string
 ```
 
 #### `.toolResult(args)`
 
 ```ts
-Content.toolResult(args: { toolCallId: string; toolName: string; result: unknown; isError?: boolean }): LanguageModelV3ToolResult
-// Content.toolResult({ toolCallId: 'c1', toolName: 'weather', result: { temp: 20 } }): { type: 'tool-result', toolCallId: 'c1', toolName: 'weather', result: { temp: 20 } }
+ContentParts.toolResult(args: { toolCallId: string; toolName: string; result: unknown; isError?: boolean }): LanguageModelV3ToolResult
+// ContentParts.toolResult({ toolCallId: 'c1', toolName: 'weather', result: { temp: 20 } }): { type: 'tool-result', toolCallId: 'c1', toolName: 'weather', result: { temp: 20 } }
 ```
 
 #### `.file(args)`
 
 ```ts
-Content.file(args: { mediaType: string; data: string | Uint8Array }): LanguageModelV3File
-// Content.file({ mediaType: 'image/png', data: 'abc' }): { type: 'file', mediaType: 'image/png', data: 'abc' }
+ContentParts.file(args: { mediaType: string; data: string | Uint8Array }): LanguageModelV3File
+// ContentParts.file({ mediaType: 'image/png', data: 'abc' }): { type: 'file', mediaType: 'image/png', data: 'abc' }
 ```
 
 #### `.source(args)`
 
 ```ts
-Content.source(args: { id: string; url: string; title?: string }): LanguageModelV3Source
-// Content.source({ id: 's1', url: 'https://example.com' }): { type: 'source', sourceType: 'url', id: 's1', url: 'https://example.com' }
+ContentParts.source(args: { id: string; url: string; title?: string }): LanguageModelV3Source
+// ContentParts.source({ id: 's1', url: 'https://example.com' }): { type: 'source', sourceType: 'url', id: 's1', url: 'https://example.com' }
 ```
 
 #### `StreamParts`
@@ -573,77 +634,6 @@ StreamParts.responseMetadata(meta?: LanguageModelV3ResponseMetadata): LanguageMo
 ```ts
 StreamParts.raw(rawValue: unknown): LanguageModelV3StreamPart
 // StreamParts.raw({ foo: 1 }): { type: 'raw', rawValue: { foo: 1 } }
-```
-
-#### `Stream`
-
-Operations for building, draining, and inspecting streams.
-
-#### `.from(parts)`
-
-```ts
-Stream.from<T>(parts: T[]): ReadableStream<T>
-// Stream.from([a, b]): ReadableStream emitting a, then b
-```
-
-#### `.simulate(chunks, options?)`
-
-```ts
-Stream.simulate<T>(chunks: T[], options?: StreamDelayOptions): ReadableStream<T>
-// Stream.simulate([a, b], { chunkDelayInMs: 5 }): ReadableStream emitting a, then b, with delays
-```
-
-#### `.toArray(stream)`
-
-```ts
-Stream.toArray<T>(stream: ReadableStream<T>): Promise<T[]>
-// Stream.toArray(stream): Promise<[a, b]>
-```
-
-#### `.toIterable(stream)`
-
-```ts
-Stream.toIterable<T>(stream: ReadableStream<T>): ReadableStream<T> & AsyncIterable<T>
-// for await (const part of Stream.toIterable(stream)) { ... } — consume a stream via for-await
-```
-
-#### `.text(parts)`
-
-```ts
-Stream.text(parts: LanguageModelV3StreamPart[]): string
-// Stream.text(StreamParts.text('Hello World')): 'Hello World'
-```
-
-#### `.finishReason(parts)`
-
-```ts
-Stream.finishReason(parts: LanguageModelV3StreamPart[]): LanguageModelV3FinishReason | undefined
-// Stream.finishReason([StreamParts.finish()]): { unified: 'stop', raw: 'stop' }
-```
-
-#### `Iterable`
-
-The async-iterable complement to `Stream`: build, drain, and convert `AsyncIterable`s (async generators, and anything consumed via `for await`). Use it when the code under test produces or consumes a plain async iterable rather than a `ReadableStream`. Cross back to the `Stream` toolbox with `.toStream`.
-
-#### `.from(items)`
-
-```ts
-Iterable.from<T>(items: T[]): AsyncIterable<T>
-// Iterable.from([a, b]): an async iterable yielding a, then b
-```
-
-#### `.toArray(iterable)`
-
-```ts
-Iterable.toArray<T>(iterable: AsyncIterable<T>): Promise<T[]>
-// Iterable.toArray(iterable): Promise<[a, b]>
-```
-
-#### `.toStream(iterable)`
-
-```ts
-Iterable.toStream<T>(iterable: AsyncIterable<T>): ReadableStream<T>
-// Iterable.toStream(iterable): a ReadableStream emitting a, then b
 ```
 
 #### `Options`
@@ -1026,6 +1016,19 @@ fromUIMessage<UIMessage>(): { UIParts; UIChunks; UIMessages }
 
 Types are split by entry point, mirroring the builders.
 
+### Streams and Iterables
+
+Exported from the root `ai-test-kit`.
+
+#### `StreamDelayOptions`
+
+Simulated timing shared by `Streams.simulate`, `MockLanguageModel.streamResult`, and the `stream` chunks form. With an `abortSignal`, the stream errors with an `AbortError` the instant the signal fires (mid-delay), matching a real provider stream.
+
+```ts
+import type { StreamDelayOptions } from 'ai-test-kit';
+// { initialDelayInMs?: number | null; chunkDelayInMs?: number | null; abortSignal?: AbortSignal }
+```
+
 ### Language Models
 
 Exported from `ai-test-kit/language`.
@@ -1074,15 +1077,6 @@ Options for the streamed-text part builders (`StreamParts.text` / `StreamParts.r
 ```ts
 import type { StreamPartOptions } from 'ai-test-kit/language';
 // { id?: string; length?: number; separator?: string }
-```
-
-#### `StreamDelayOptions`
-
-Simulated timing shared by `Stream.simulate`, `MockLanguageModel.streamResult`, and the `stream` chunks form. With an `abortSignal`, the stream errors with an `AbortError` the instant the signal fires (mid-delay), matching a real provider stream.
-
-```ts
-import type { StreamDelayOptions } from 'ai-test-kit/language';
-// { initialDelayInMs?: number | null; chunkDelayInMs?: number | null; abortSignal?: AbortSignal }
 ```
 
 ### Embedding Models

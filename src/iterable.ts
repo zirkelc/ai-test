@@ -8,11 +8,11 @@ async function* fromArray<ITEM>(items: Array<ITEM>): AsyncGenerator<ITEM> {
 /**
  * Operations for building, draining, and converting async iterables in tests.
  *
- * The complement to `Stream`: where `Stream` works with `ReadableStream`s, `Iterable` works with
+ * The complement to `Streams`: where `Streams` works with `ReadableStream`s, `Iterables` works with
  * `AsyncIterable`s (async generators and anything consumed via `for await`). Cross over to the full
- * `Stream` toolbox with `Iterable.toStream`.
+ * `Streams` toolbox with `Iterables.toStream`.
  */
-export const Iterable = {
+export const Iterables = {
   /** Builds an `AsyncIterable` that yields each item in order, e.g. to feed code that consumes one. */
   from: <ITEM>(items: Array<ITEM>): AsyncIterable<ITEM> => fromArray(items),
 

@@ -9,7 +9,7 @@ import type {
 import { toJSONString } from '../internal/json.js';
 
 /** Builders for the static content parts a language model returns from `doGenerate`. */
-export const Content = {
+export const ContentParts = {
   /** A text part. */
   text: (text: string): LanguageModelV3Text => ({ type: 'text', text }),
 

@@ -11,8 +11,8 @@ import type {
 import { type Mock, vi } from 'vitest';
 import { defaultFinishReason, defaultUsage, toFinishReason } from '../internal/defaults.js';
 import { defaultProvider, nextModelId } from '../internal/identity.js';
-import { Content } from './content.js';
-import { simulateStream, type StreamDelayOptions } from './stream.js';
+import { ContentParts } from './content.js';
+import { simulateStream, type StreamDelayOptions } from '../stream.js';
 import { StreamParts } from './stream-parts.js';
 
 /** A (possibly partial) non-streaming result; only `content` is required, the rest defaults. */
@@ -96,7 +96,7 @@ const contentToStream = (
 ];
 
 /** The streamed form of a string is the streamed form of a single text content part. */
-const textToStream = (text: string): Array<LanguageModelV3StreamPart> => contentToStream([Content.text(text)]);
+const textToStream = (text: string): Array<LanguageModelV3StreamPart> => contentToStream([ContentParts.text(text)]);
 
 /** Fills a partial generate result with default finish reason, usage, and warnings; coerces a string finish reason. */
 const buildGenerateResult = (input: GenerateResultInput): LanguageModelV3GenerateResult => {
@@ -122,7 +122,7 @@ const resolveGenerateResponse = async (
   response: GenerateResponse,
   options: LanguageModelV3CallOptions,
 ): Promise<LanguageModelV3GenerateResult> => {
-  if (typeof response === 'string') return buildGenerateResult({ content: [Content.text(response)] });
+  if (typeof response === 'string') return buildGenerateResult({ content: [ContentParts.text(response)] });
   if (response instanceof Error) throw response;
   if (typeof response === 'function') return response(options);
   return buildGenerateResult(response);
@@ -151,7 +151,7 @@ const resolveGenerate = async (
   response: MockResponse,
   options: LanguageModelV3CallOptions,
 ): Promise<LanguageModelV3GenerateResult> => {
-  if (typeof response === 'string') return buildGenerateResult({ content: [Content.text(response)] });
+  if (typeof response === 'string') return buildGenerateResult({ content: [ContentParts.text(response)] });
   if (response instanceof Error) throw response;
   if (isExplicit(response)) {
     return response.generate === undefined
@@ -232,11 +232,11 @@ class LanguageModelMock implements LanguageModelV3 {
 
 /** Builds the content array for a generate result: a string becomes one text part; an array passes through. */
 const content = (input: string | Array<LanguageModelV3Content>): Array<LanguageModelV3Content> =>
-  typeof input === 'string' ? [Content.text(input)] : input;
+  typeof input === 'string' ? [ContentParts.text(input)] : input;
 
 /** Builds a full generate result, filling finish reason, usage, and warnings. */
 const generateResult = (input: string | GenerateResultInput): LanguageModelV3GenerateResult =>
-  buildGenerateResult(typeof input === 'string' ? { content: [Content.text(input)] } : input);
+  buildGenerateResult(typeof input === 'string' ? { content: [ContentParts.text(input)] } : input);
 
 /** Builds a full stream result; a string is assembled into `stream-start` → text → `finish`. */
 const streamResult = (

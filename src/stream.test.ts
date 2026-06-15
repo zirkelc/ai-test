@@ -1,44 +1,14 @@
 import { describe, expect, test } from 'vitest';
-import { Stream } from './stream.js';
-import { StreamParts } from './stream-parts.js';
+import { StreamParts } from './language/stream-parts.js';
+import { Streams } from './stream.js';
 
-describe('Stream', () => {
-  test('text() should join text-delta parts', () => {
-    // Arrange
-    const parts = StreamParts.text('Hello World');
-
-    // Act
-    const text = Stream.text(parts);
-
-    // Assert
-    expect(text).toBe('Hello World');
-  });
-
-  test('finishReason() should read the finish part', () => {
-    // Arrange
-    const parts = [...StreamParts.text('hi'), StreamParts.finish({ finishReason: 'length' })];
-
-    // Act
-    const reason = Stream.finishReason(parts);
-
-    // Assert
-    expect(reason).toEqual({ unified: 'length', raw: 'length' });
-  });
-
-  test('finishReason() should be undefined without a finish part', () => {
-    // Act
-    const reason = Stream.finishReason(StreamParts.text('hi'));
-
-    // Assert
-    expect(reason).toBe(undefined);
-  });
-
+describe('Streams', () => {
   test('from() and toArray() should round-trip parts', async () => {
     // Arrange
     const parts = StreamParts.text('round');
 
     // Act
-    const roundTripped = await Stream.toArray(Stream.from(parts));
+    const roundTripped = await Streams.toArray(Streams.from(parts));
 
     // Assert
     expect(roundTripped).toEqual(parts);
@@ -49,7 +19,7 @@ describe('Stream', () => {
     const parts = StreamParts.text('sim');
 
     // Act
-    const drained = await Stream.toArray(Stream.simulate(parts));
+    const drained = await Streams.toArray(Streams.simulate(parts));
 
     // Assert
     expect(drained).toEqual(parts);
@@ -57,11 +27,11 @@ describe('Stream', () => {
 
   test('toIterable() should make a stream consumable via for-await', async () => {
     // Arrange
-    const stream = Stream.from(['a', 'b', 'c']);
+    const stream = Streams.from(['a', 'b', 'c']);
 
     // Act
     const collected: Array<string> = [];
-    for await (const item of Stream.toIterable(stream)) {
+    for await (const item of Streams.toIterable(stream)) {
       collected.push(item);
     }
 
@@ -71,11 +41,11 @@ describe('Stream', () => {
 
   test('toIterable() should stop reading the source when the loop breaks early', async () => {
     // Arrange
-    const stream = Stream.from(['a', 'b', 'c']);
+    const stream = Streams.from(['a', 'b', 'c']);
 
     // Act
     const collected: Array<string> = [];
-    for await (const item of Stream.toIterable(stream)) {
+    for await (const item of Streams.toIterable(stream)) {
       collected.push(item);
       break;
     }
@@ -88,10 +58,10 @@ describe('Stream', () => {
     // Arrange
     const controller = new AbortController();
     controller.abort();
-    const stream = Stream.simulate(StreamParts.text('nope'), { abortSignal: controller.signal });
+    const stream = Streams.simulate(StreamParts.text('nope'), { abortSignal: controller.signal });
 
     // Act
-    const error = await Stream.toArray(stream).catch((e: unknown) => e);
+    const error = await Streams.toArray(stream).catch((e: unknown) => e);
 
     // Assert
     expect(error).toBeInstanceOf(DOMException);
@@ -102,7 +72,7 @@ describe('Stream', () => {
     // Arrange
     const controller = new AbortController();
     const parts = [...StreamParts.text('Hello World'), StreamParts.finish()];
-    const stream = Stream.simulate(parts, { chunkDelayInMs: 10, abortSignal: controller.signal });
+    const stream = Streams.simulate(parts, { chunkDelayInMs: 10, abortSignal: controller.signal });
     const reader = stream.getReader();
 
     // Act

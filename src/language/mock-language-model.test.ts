@@ -1,9 +1,9 @@
 import { generateText, streamText } from 'ai';
 import { describe, expect, test } from 'vitest';
-import { Content } from './content.js';
+import { Streams } from '../stream.js';
+import { ContentParts } from './content.js';
 import { MockLanguageModel } from './mock-language-model.js';
 import { Options } from './options.js';
-import { Stream } from './stream.js';
 import { StreamParts } from './stream-parts.js';
 
 describe('MockLanguageModel', () => {
@@ -30,9 +30,9 @@ describe('MockLanguageModel', () => {
       await expect(result).rejects.toThrow();
     });
 
-    test('should return explicit content built from Content atoms', async () => {
+    test('should return explicit content built from ContentParts atoms', async () => {
       // Arrange
-      const model = MockLanguageModel.from({ content: [Content.text('explicit')] });
+      const model = MockLanguageModel.from({ content: [ContentParts.text('explicit')] });
 
       // Act
       const result = await generateText({ model, prompt: 'Hi', ...Options.generate });
@@ -44,7 +44,7 @@ describe('MockLanguageModel', () => {
 
     test('should accept a unified finish-reason string in the content form', async () => {
       // Arrange
-      const model = MockLanguageModel.from({ content: [Content.text('truncated')], finishReason: 'length' });
+      const model = MockLanguageModel.from({ content: [ContentParts.text('truncated')], finishReason: 'length' });
 
       // Act
       const result = await generateText({ model, prompt: 'Hi', ...Options.generate });
@@ -66,10 +66,10 @@ describe('MockLanguageModel', () => {
       expect(result.text).toBe('prompt-parts:1');
     });
 
-    test('should surface a tool call from Content.toolCall', async () => {
+    test('should surface a tool call from ContentParts.toolCall', async () => {
       // Arrange
       const model = MockLanguageModel.from({
-        content: [Content.toolCall({ toolCallId: 'call-1', toolName: 'weather', input: { city: 'Tokyo' } })],
+        content: [ContentParts.toolCall({ toolCallId: 'call-1', toolName: 'weather', input: { city: 'Tokyo' } })],
       });
 
       // Act
@@ -88,7 +88,7 @@ describe('MockLanguageModel', () => {
 
       // Act
       const result = streamText({ model, prompt: 'Hi', ...Options.stream });
-      const text = (await Stream.toArray(result.textStream)).join('');
+      const text = (await Streams.toArray(result.textStream)).join('');
 
       // Assert
       expect(text).toBe('Hello World');
@@ -101,7 +101,7 @@ describe('MockLanguageModel', () => {
 
       // Act
       const result = streamText({ model, prompt: 'Hi', ...Options.stream });
-      const text = (await Stream.toArray(result.textStream)).join('');
+      const text = (await Streams.toArray(result.textStream)).join('');
 
       // Assert
       expect(text).toBe('abcdef');
@@ -109,11 +109,11 @@ describe('MockLanguageModel', () => {
 
     test('should derive a stream from content', async () => {
       // Arrange
-      const model = MockLanguageModel.from({ content: [Content.text('derived')] });
+      const model = MockLanguageModel.from({ content: [ContentParts.text('derived')] });
 
       // Act
       const result = streamText({ model, prompt: 'Hi', ...Options.stream });
-      const text = (await Stream.toArray(result.textStream)).join('');
+      const text = (await Streams.toArray(result.textStream)).join('');
 
       // Assert
       expect(text).toBe('derived');
@@ -122,12 +122,12 @@ describe('MockLanguageModel', () => {
     test('should make a string and the equivalent content stream identically', async () => {
       // Arrange
       const fromString = MockLanguageModel.from('Hello');
-      const fromContent = MockLanguageModel.from({ content: [Content.text('Hello')] });
+      const fromContent = MockLanguageModel.from({ content: [ContentParts.text('Hello')] });
       const callOptions = { prompt: [] } as never;
 
       // Act
-      const stringParts = await Stream.toArray((await fromString.doStream(callOptions)).stream);
-      const contentParts = await Stream.toArray((await fromContent.doStream(callOptions)).stream);
+      const stringParts = await Streams.toArray((await fromString.doStream(callOptions)).stream);
+      const contentParts = await Streams.toArray((await fromContent.doStream(callOptions)).stream);
 
       // Assert
       expect(stringParts).toEqual(contentParts);
@@ -141,7 +141,7 @@ describe('MockLanguageModel', () => {
 
       // Act
       const result = streamText({ model, prompt: 'Hi', ...Options.stream });
-      const text = (await Stream.toArray(result.textStream)).join('');
+      const text = (await Streams.toArray(result.textStream)).join('');
 
       // Assert
       expect(text).toBe('fast');
@@ -155,7 +155,7 @@ describe('MockLanguageModel', () => {
 
       // Act
       const result = streamText({ model, prompt: 'Hi', ...Options.stream });
-      const text = (await Stream.toArray(result.textStream)).join('');
+      const text = (await Streams.toArray(result.textStream)).join('');
 
       // Assert
       expect(text).toBe('has-prompt');
@@ -164,11 +164,11 @@ describe('MockLanguageModel', () => {
     test('should stream from a bare ReadableStream in the stream form', async () => {
       // Arrange
       const parts = [StreamParts.streamStart(), ...StreamParts.text('piped'), StreamParts.finish()];
-      const model = MockLanguageModel.from({ stream: Stream.from(parts) });
+      const model = MockLanguageModel.from({ stream: Streams.from(parts) });
 
       // Act
       const result = streamText({ model, prompt: 'Hi', ...Options.stream });
-      const text = (await Stream.toArray(result.textStream)).join('');
+      const text = (await Streams.toArray(result.textStream)).join('');
 
       // Assert
       expect(text).toBe('piped');
@@ -315,14 +315,14 @@ describe('MockLanguageModel', () => {
     test('streamResult() should wrap a ReadableStream as a stream result', async () => {
       // Arrange
       const parts = [...StreamParts.text('wrapped'), StreamParts.finish()];
-      const stream = Stream.from(parts);
+      const stream = Streams.from(parts);
 
       // Act
       const result = MockLanguageModel.streamResult(stream);
 
       // Assert
       expect(result.stream).toBe(stream);
-      expect(await Stream.toArray(result.stream)).toEqual(parts);
+      expect(await Streams.toArray(result.stream)).toEqual(parts);
     });
   });
 

@@ -6,10 +6,8 @@ describe('language barrel', () => {
     // Assert
     expect(typeof language.MockLanguageModel).toBe('object');
     expect(typeof language.MockLanguageModel.from).toBe('function');
-    expect(typeof language.Content).toBe('object');
+    expect(typeof language.ContentParts).toBe('object');
     expect(typeof language.StreamParts).toBe('object');
-    expect(typeof language.Stream).toBe('object');
-    expect(typeof language.Iterable).toBe('object');
     expect(typeof language.Options).toBe('object');
   });
 });

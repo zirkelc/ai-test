@@ -1,11 +1,10 @@
-import type { LanguageModelV3FinishReason, LanguageModelV3StreamPart } from '@ai-sdk/provider';
 import { convertArrayToReadableStream, convertReadableStreamToArray } from '@ai-sdk/provider-utils/test';
 
-/** Simulated timing for a stream. Shared by `Stream.simulate`, `MockLanguageModel.streamResult`, and the `stream` chunks form. */
+/** Simulated timing for a stream. Shared by `Streams.simulate`, `MockLanguageModel.streamResult`, and the `stream` chunks form. */
 export type StreamDelayOptions = {
-  /** Delay before the first part is emitted; `null` skips the delay. Defaults to `0`. */
+  /** Delay before the first chunk is emitted; `null` skips the delay. Defaults to `0`. */
   initialDelayInMs?: number | null;
-  /** Delay between each subsequent part; `null` skips the delay. Defaults to `0`. */
+  /** Delay between each subsequent chunk; `null` skips the delay. Defaults to `0`. */
   chunkDelayInMs?: number | null;
   /** When provided, the stream errors with an `AbortError` the instant the signal fires. */
   abortSignal?: AbortSignal;
@@ -34,13 +33,13 @@ const delay = (ms: number | null, signal: AbortSignal | undefined): Promise<void
 
 /**
  * Builds a delayed `ReadableStream`, a port of the AI SDK's `simulateReadableStream` (delay before each
- * part, `null` to skip) extended with abort handling: when an `abortSignal` fires it errors with an
+ * chunk, `null` to skip) extended with abort handling: when an `abortSignal` fires it errors with an
  * `AbortError` at once (even mid-delay), matching a real provider stream. Inert without a signal.
  */
-export const simulateStream = <PART>(chunks: Array<PART>, opts: StreamDelayOptions = {}): ReadableStream<PART> => {
+export const simulateStream = <CHUNK>(chunks: Array<CHUNK>, opts: StreamDelayOptions = {}): ReadableStream<CHUNK> => {
   const { abortSignal, initialDelayInMs = 0, chunkDelayInMs = 0 } = opts;
   let index = 0;
-  return new ReadableStream<PART>({
+  return new ReadableStream<CHUNK>({
     async pull(controller) {
       if (abortSignal?.aborted) {
         controller.error(abortError());
@@ -65,10 +64,10 @@ export const simulateStream = <PART>(chunks: Array<PART>, opts: StreamDelayOptio
  * Wraps a `ReadableStream` so it can also be consumed via `for await`, piping through a fresh
  * `TransformStream` so the source stays unlocked. Ported from the AI SDK's `createAsyncIterableStream`.
  */
-const streamToAsyncIterable = <PART>(source: ReadableStream<PART>): ReadableStream<PART> & AsyncIterable<PART> => {
-  const stream = source.pipeThrough(new TransformStream<PART, PART>());
+const streamToAsyncIterable = <CHUNK>(source: ReadableStream<CHUNK>): ReadableStream<CHUNK> & AsyncIterable<CHUNK> => {
+  const stream = source.pipeThrough(new TransformStream<CHUNK, CHUNK>());
   return Object.assign(stream, {
-    [Symbol.asyncIterator](): AsyncIterator<PART> {
+    [Symbol.asyncIterator](): AsyncIterator<CHUNK> {
       const reader = stream.getReader();
       let finished = false;
       const cleanup = async (): Promise<void> => {
@@ -84,7 +83,7 @@ const streamToAsyncIterable = <PART>(source: ReadableStream<PART>): ReadableStre
         }
       };
       return {
-        async next(): Promise<IteratorResult<PART>> {
+        async next(): Promise<IteratorResult<CHUNK>> {
           if (finished) return { done: true, value: undefined };
           const { done, value } = await reader.read();
           if (done) {
@@ -93,11 +92,11 @@ const streamToAsyncIterable = <PART>(source: ReadableStream<PART>): ReadableStre
           }
           return { done: false, value };
         },
-        async return(): Promise<IteratorResult<PART>> {
+        async return(): Promise<IteratorResult<CHUNK>> {
           await cleanup();
           return { done: true, value: undefined };
         },
-        async throw(error: unknown): Promise<IteratorResult<PART>> {
+        async throw(error: unknown): Promise<IteratorResult<CHUNK>> {
           await cleanup();
           throw error;
         },
@@ -106,31 +105,19 @@ const streamToAsyncIterable = <PART>(source: ReadableStream<PART>): ReadableStre
   });
 };
 
-/** Operations for building, draining, and inspecting language model streams in tests. */
-export const Stream = {
-  /** Builds a `ReadableStream` from an array of parts. */
-  from: <PART>(parts: Array<PART>): ReadableStream<PART> => convertArrayToReadableStream(parts),
+/** Generic, layer-agnostic operations for building, draining, and converting `ReadableStream`s in tests. */
+export const Streams = {
+  /** Builds a `ReadableStream` from an array of chunks. */
+  from: <CHUNK>(chunks: Array<CHUNK>): ReadableStream<CHUNK> => convertArrayToReadableStream(chunks),
 
-  /** Builds a `ReadableStream` that emits parts with optional delays, for timing tests. */
-  simulate: <PART>(chunks: Array<PART>, opts: StreamDelayOptions = {}): ReadableStream<PART> =>
+  /** Builds a `ReadableStream` that emits chunks with optional delays, for timing tests. */
+  simulate: <CHUNK>(chunks: Array<CHUNK>, opts: StreamDelayOptions = {}): ReadableStream<CHUNK> =>
     simulateStream(chunks, opts),
 
-  /** Reads a stream to completion and returns every part it emitted. */
-  toArray: <PART>(stream: ReadableStream<PART>): Promise<Array<PART>> => convertReadableStreamToArray(stream),
+  /** Reads a stream to completion and returns every chunk it emitted. */
+  toArray: <CHUNK>(stream: ReadableStream<CHUNK>): Promise<Array<CHUNK>> => convertReadableStreamToArray(stream),
 
   /** Wraps a `ReadableStream` so it can also be consumed via `for await`. */
-  toIterable: <PART>(stream: ReadableStream<PART>): ReadableStream<PART> & AsyncIterable<PART> =>
+  toIterable: <CHUNK>(stream: ReadableStream<CHUNK>): ReadableStream<CHUNK> & AsyncIterable<CHUNK> =>
     streamToAsyncIterable(stream),
-
-  /** Joins the `text-delta` parts of a stream-part sequence into the full text. */
-  text: (parts: Array<LanguageModelV3StreamPart>): string =>
-    parts
-      .filter((part): part is Extract<LanguageModelV3StreamPart, { type: 'text-delta' }> => part.type === 'text-delta')
-      .map((part) => part.delta)
-      .join(''),
-
-  /** Returns the finish reason from a stream-part sequence, if a `finish` part is present. */
-  finishReason: (parts: Array<LanguageModelV3StreamPart>): LanguageModelV3FinishReason | undefined =>
-    parts.find((part): part is Extract<LanguageModelV3StreamPart, { type: 'finish' }> => part.type === 'finish')
-      ?.finishReason,
 };

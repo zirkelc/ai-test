@@ -2,7 +2,7 @@ import type { LanguageModelV3FinishReason, LanguageModelV3StreamPart, LanguageMo
 import { defaultFinishReason, defaultUsage, toFinishReason } from '../internal/defaults.js';
 import { toJSONString } from '../internal/json.js';
 import { tokenize } from '../internal/tokenize.js';
-import { Content } from './content.js';
+import { ContentParts } from './content.js';
 
 /** The `warnings` array carried by a `stream-start` part. */
 type StreamStartWarnings = Extract<LanguageModelV3StreamPart, { type: 'stream-start' }>['warnings'];
@@ -60,21 +60,21 @@ export const StreamParts = {
 
   /** A completed tool call (same shape as the content part). */
   toolCall: (args: { toolCallId: string; toolName: string; input: unknown }): LanguageModelV3StreamPart =>
-    Content.toolCall(args),
+    ContentParts.toolCall(args),
 
   /** A tool result (same shape as the content part). */
   toolResult: (args: {
     toolCallId: string;
     toolName: string;
-    result: Parameters<typeof Content.toolResult>[0]['result'];
+    result: Parameters<typeof ContentParts.toolResult>[0]['result'];
     isError?: boolean;
-  }): LanguageModelV3StreamPart => Content.toolResult(args),
+  }): LanguageModelV3StreamPart => ContentParts.toolResult(args),
 
   /** A source part. */
-  source: (args: { id: string; url: string; title?: string }): LanguageModelV3StreamPart => Content.source(args),
+  source: (args: { id: string; url: string; title?: string }): LanguageModelV3StreamPart => ContentParts.source(args),
 
   /** A file part. */
-  file: (args: { mediaType: string; data: string | Uint8Array }): LanguageModelV3StreamPart => Content.file(args),
+  file: (args: { mediaType: string; data: string | Uint8Array }): LanguageModelV3StreamPart => ContentParts.file(args),
 
   /** The terminal `finish` part with usage and finish reason. The finish reason may be a unified string. */
   finish: (
