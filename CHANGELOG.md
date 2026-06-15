@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.2.0](https://github.com/zirkelc/ai-test-kit/compare/v1.1.0...v1.2.0) (2026-06-15)
+
+
+### Features
+
+* add embedding and image model mocks ([c23af48](https://github.com/zirkelc/ai-test-kit/commit/c23af4840efdd2d5a9d61977880463398327cd31))
+
+
+### Code Refactoring
+
+* move Stream/Iterable to root and pluralize builder namespaces ([b090ad5](https://github.com/zirkelc/ai-test-kit/commit/b090ad5ec2ffffa075b2ba7849f4c71f8d066f64))
+
+
+### Documentation
+
+* add logo and banner assets, logo into README ([3775af6](https://github.com/zirkelc/ai-test-kit/commit/3775af619172f58b42b21fd10eb86b6d8f519b40))
+* enlarge checkmarks and add spacing below logo mark ([8d62f9b](https://github.com/zirkelc/ai-test-kit/commit/8d62f9b8874fb7005d415f02d5bf858c647cce19))
+* fix tool part key and clarify tool-${string} prefix selection ([4cb79a2](https://github.com/zirkelc/ai-test-kit/commit/4cb79a23ea400309b0a65ea5a5f08a2a24d3c1e3))
+
+
+### Continuous Integration
+
+* bump actions to Node 24 runtimes ([#4](https://github.com/zirkelc/ai-test-kit/issues/4)) ([d306815](https://github.com/zirkelc/ai-test-kit/commit/d30681515dfb21c07c500ac1dd6a9f4cccf85637))
+
 ## [1.1.0](https://github.com/zirkelc/ai-test-kit/compare/v1.0.1...v1.1.0) (2026-06-11)
 
 
